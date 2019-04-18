@@ -1,0 +1,17 @@
+{
+    "configurations": [
+        {
+            "name": "Win32",
+            "includePath": [
+                "E:\\\\IDE\\\\Arduino\\\\tools\\\\**",
+                "E:\\\\IDE\\\\Arduino\\\\hardware\\\\arduino\\\\avr\\\\**"
+            ],
+            "forcedInclude": [
+                "E:\\\\IDE\\\\Arduino\\\\hardware\\\\arduino\\\\avr\\\\cores\\\\arduino\\\\Arduino.h"
+            ],
+            "intelliSenseMode": "msvc-x64",
+            "compilerPath": "E:\\Environment\\MinGW\\bin\\gcc.exe"
+        }
+    ],
+    "version": 4
+}

@@ -2,5 +2,9 @@
 
 Homenvi-IEMS室内环境监测系统
 
-Board：WeMos D1
+- Board：
+    Master: WeMos D1 
+    Slave : Arduino Nano
 
+- Lib:
+    DHT-sensor-library: https://github.com/adafruit/DHT-sensor-library
