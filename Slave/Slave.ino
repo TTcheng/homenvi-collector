@@ -11,6 +11,7 @@
 */
 #include <WString.h>
 #include "DHT.h"
+#include "TSL2581.h"
 
 /* humiture macro */
 #define DHTPIN 2
@@ -30,6 +31,10 @@ DHT dht(DHTPIN, DHTTYPE);
 #define       GAS_DIGITAL_PIN                  4
 #define       GAS_ANALOG_PIN                   A1
 
+/* brightness macro */
+#define       TSL2581_INT                      5
+WaveShare_TSL2581 tsl = WaveShare_TSL2581();
+
 /* private functions */
 String readHumiture();
 
@@ -47,6 +52,15 @@ void setup() {
   /* init humiture sensor*/
   pinMode(DHTPIN, INPUT);
   dht.begin();
+  /* init brightness sensor */
+  Wire.begin(); //i2c config
+  pinMode(TSL2581_INT, INPUT);      
+  read_id();
+  tsl.TSL2581_power_on();
+  delay(2000);
+  tsl.TSL2581_config();
+
+
   sendInfo("Slave setup");
 }
 
@@ -139,8 +153,43 @@ String readFlammableGas(){
   return res;
 }
 
+/**
+ * 采集光强度,单位lux，范围:
+ */
 String readBrightness(){
-  return "brightness=5000";
+  unsigned long lux;
+  tsl.TSL2581_Read_Channel();
+  lux = tsl.calculateLux(2, NOM_INTEG_CYCLE);
+  Read_gpio_interrupt(2000, 50000);
+  String res = "brightness=";
+  res.concat(lux);
+  return res;
+}
+
+void read_id(void) {
+  int id;
+  int a;
+  id = tsl.TSL2581_Read_ID();
+  a = id & 0xf0;    // The lower four bits are the silicon version number
+  if (!(a == 144))  { // ID = 90H = 144D
+    sendInfo("false ");
+  } else {
+    String info = "I2C DEV is working ,id: ";
+    info.concat(id);
+    sendInfo(info);
+    delay(500);
+  }
+}
+
+void Read_gpio_interrupt(uint16_t mindata, uint16_t maxdata) {
+  tsl.SET_Interrupt_Threshold(mindata, maxdata);
+  int val = digitalRead(TSL2581_INT);
+  if (val == 1) {
+    sendInfo("brightness sensor interrupt 1");
+  } else {
+    sendInfo("brightness sensor interrupt 0");
+    tsl.Reload_register();
+  }
 }
 
 /**
