@@ -4,6 +4,7 @@
 
   Created on: 04.12.2019
   @author wangchuncheng
+  @mail ttchengwang@foxmail.com
 */
 
 #include <ESP8266WiFi.h>
@@ -27,13 +28,14 @@ struct {
 
   String user;
   String password;
-} server{"120.27.144.202", 80, "HomenviCollectorAlpha",
+} server{"106.14.139.98", 80, "HomenviCollectorAlpha",
          "o/2FPLOIbSojNVOOllhA1x/2/StL54d5DnjuQK9LfvI="},
-    db{"132.232.181.189", 8086, "homenvi-collector", "homenvi"};
+    db{"106.14.139.98", 80, "homenvi-collector", "homenvi"};
 
-String db_uri = "/write?db=";
+String db_uri = "/influx/write?db=";
 
 void logToSerial(String, String = "");
+void logToDB(String, String = "");
 
 void setup() {
   db_uri.concat(DB_NAME);
@@ -83,19 +85,67 @@ void loop() {
     }
     if (comdata.length() > 0) {
       if (comdata.indexOf('=') > 0) {
-        logToSerial(comdata);
+        String finalData = fixComData(comdata);
+        logToSerial("finalData:", finalData);
         // data collections: "name1=value1,name2=value2,...."
         String payload = "collections,identifier=";
         payload.concat(server.user);
         payload.concat(' ');
-        payload.concat(comdata);
+        payload.concat(finalData);
         writeDB(payload);
       } else {
         // debug info
-        logToSerial(comdata);
+        logToDB(comdata);
       }
     }
   }
+}
+
+const String collectionNames[] = {"humidity",
+                                "celsius",
+                                "fahrenheit",
+                                "heatIndexCelsius",
+                                "heatIndexFahrenheit",
+                                "sound",
+                                "brightness",
+                                "dustDensity",
+                                "gasValue"};
+/**
+ * 串口数据可能会有错误，丢弃损坏的数据
+ */
+String fixComData(String comData) {
+  unsigned int maxlen = 200;
+  if (comData.length() > maxlen) {
+    return "";
+  }
+  char chars[maxlen];
+  comData.toCharArray(chars, maxlen);
+  String collections[9];
+  unsigned int i, j = 0;
+  for (unsigned int i = 0; i < maxlen, chars[i] != 0, j < 9; i++) {
+    if (chars[i] == ',') {
+      j++;
+      continue;
+    }
+    collections[j] += chars[i];
+  }
+  String res = "";
+  for (i = 0; i < 9; i++) {
+    String thisCollection = collections[i];
+    bool correct = false;
+    for (j = 0; j < 9; j++) {
+      if (thisCollection.startsWith(collectionNames[j]) != 0 &&
+          '=' == thisCollection.charAt(collectionNames[j].length())) {
+        correct = true;
+        break;
+      }
+    }
+    if (correct) {
+      res += thisCollection;
+      res += ',';
+    }
+  }
+  return res.substring(0, res.length() - 1);
 }
 
 /**
@@ -105,15 +155,18 @@ void writeDB(String payload){
   WiFiClient client;
   HTTPClient http;
   http.begin(client, db.host, db.port, db_uri);
-  http.addHeader("Content-Type","text/plain");
+  http.addHeader("Content-Type", "text/plain");
   int httpCode = http.POST(payload);
   if (httpCode > 0) {
     if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_NO_CONTENT) {
       logToSerial("Successfully Send collections to server!\n");
-      return;
+    } else {
+      logToSerial("[HTTP] POST, Failed to send collections... with wrong code : ", String(httpCode));
+      String error = http.getString();
+      if (error.length() > 0) {
+        logToSerial("[HTTP] Error info:", error);
+      }
     }
-    logToSerial("[HTTP] POST, Failed to send collections... with wrong code : ", String(httpCode));
-    return;
   } else {
     logToSerial("[HTTP] POST, Failed to send collections... , error: ", http.errorToString(httpCode));
   }
@@ -135,7 +188,6 @@ void notifyServer(const String encodedParams) {
   uri.concat(encodedParams);
   http.begin(client, server.host, server.port, uri);
 
-  // Serial.printf("Send get request http://%s:%d%s\n", server.host.c_str(), server.port, uri.c_str());
   int httpCode = http.GET();
   if (httpCode > 0) {
     if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_NO_CONTENT) {
@@ -144,12 +196,11 @@ void notifyServer(const String encodedParams) {
       if (payload.length() > 0) {
         logToSerial("response : ", payload);
       }
-      return;
+    } else {
+      logToSerial("[HTTP] GET, Failed to notify server! with wrong code : ", String(httpCode));
     }
-    logToSerial("[HTTP] GET... with wrong code : ", String(httpCode));
-    return;
   } else {
-    logToSerial("[HTTP] GET... failed, error: ", http.errorToString(httpCode));
+    logToSerial("[HTTP] GET, Failed to notify server! error: ", http.errorToString(httpCode));
   }
   http.end();
 }
@@ -182,4 +233,17 @@ void logToSerial(String msg, String append){
     msg.concat(append);
     Serial.println(msg.c_str());
   }
+}
+
+void logToDB(String msg, String append){
+  logToSerial(msg, append);
+  String payload = "logging,identifier=";
+  payload += server.user;
+  payload += ' ';
+  payload += "content=";
+  payload += '"';
+  payload += msg;
+  payload += append;
+  payload += '"';
+  writeDB(payload);
 }
