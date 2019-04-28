@@ -8,17 +8,20 @@
 
   Created on: 04.18.2019
   @author wangchuncheng
+  @mail ttchengwang@foxmail.com
 */
 #include <WString.h>
+#include <SoftwareSerial.h>
 #include "DHT.h"
 #include "TSL2581.h"
+
+#define LOG_SERIAL true
+SoftwareSerial masterSerial(11, 12); // RX, TX
 
 /* humiture macro */
 #define DHTPIN 2
 #define DHTTYPE DHT22
 DHT dht(DHTPIN, DHTTYPE);
-
-#define SOUNDPIN A0
 
 /* dust macro */
 #define        COV_RATIO                       0.2            //ug/mmm / mv
@@ -35,11 +38,16 @@ DHT dht(DHTPIN, DHTTYPE);
 #define       TSL2581_INT                      5
 WaveShare_TSL2581 tsl = WaveShare_TSL2581();
 
+/* sound macro */
+#define       SOUNDPIN                         A2
+#define       SOUNDINT                         6
+
 /* private functions */
 String readHumiture();
 
 void setup() {
   Serial.begin(9600);
+  masterSerial.begin(9600);
 
   pinMode(SOUNDPIN, INPUT);
   /* init dust sensor*/
@@ -59,9 +67,6 @@ void setup() {
   tsl.TSL2581_power_on();
   delay(2000);
   tsl.TSL2581_config();
-
-
-  sendInfo("Slave setup");
 }
 
 void loop() {
@@ -95,7 +100,7 @@ String readDust(){
   adcvalue = analogRead(DUST_PIN);
   digitalWrite(DUST_LED, LOW);
   
-  // adcvalue = DustFilter(adcvalue);
+  adcvalue = DustFilter(adcvalue);
   // covert voltage (mv)
   voltage = (SYS_VOLTAGE / 1024.0) * adcvalue * 11;
   //voltage to density
@@ -160,7 +165,7 @@ String readBrightness(){
   unsigned long lux;
   tsl.TSL2581_Read_Channel();
   lux = tsl.calculateLux(2, NOM_INTEG_CYCLE);
-  Read_gpio_interrupt(2000, 50000);
+  // Read_gpio_interrupt(2000, 50000);
   String res = "brightness=";
   res.concat(lux);
   return res;
@@ -172,7 +177,7 @@ void read_id(void) {
   id = tsl.TSL2581_Read_ID();
   a = id & 0xf0;    // The lower four bits are the silicon version number
   if (!(a == 144))  { // ID = 90H = 144D
-    sendInfo("false ");
+    sendInfo("brightness sensor may not work ");
   } else {
     String info = "I2C DEV is working ,id: ";
     info.concat(id);
@@ -241,9 +246,21 @@ String readHumiture() {
 /**
  * 发送数据到master,format: "name1=value1,name2=value2...."
  */
-void sendData(String data) { Serial.write(data.c_str()); }
+void sendData(String data) { 
+  masterSerial.write(data.c_str());
+  logToSerial(data);
+}
+
+/**
+ * Serial log
+ */
+void logToSerial(String msg){
+  if(LOG_SERIAL){
+    Serial.println(msg.c_str());
+  }
+}
 /**
  * 发送信息到master，注意内容应不含'='。
  * info shouldn't contains '='
  */
-void sendInfo(String info) { Serial.write(info.c_str()); }
+void sendInfo(String info) { sendData(info); }
