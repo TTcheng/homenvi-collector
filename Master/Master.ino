@@ -100,16 +100,20 @@ void loop() {
     }
   }
 }
-
-const String collectionNames[] = {"humidity",
-                                "celsius",
-                                "fahrenheit",
-                                "heatIndexCelsius",
-                                "heatIndexFahrenheit",
-                                "sound",
-                                "brightness",
-                                "dustDensity",
-                                "gasValue"};
+typedef struct {
+  String name;
+  int min;
+  int max;
+} Specification;
+const Specification specifications[] = {{"humidity", 0, 100},
+                                        {"celsius", -40, 80},
+                                        {"heatIndexCelsius", -40, 80},
+                                        {"fahrenheit", -104, 176},
+                                        {"heatIndexFahrenheit", -104, 176},
+                                        {"sound", 0, 1023},
+                                        {"brightness", 0, 10000},
+                                        {"dustDensity", 0, 500},
+                                        {"gasValue", 0, 1023}};
 /**
  * 串口数据可能会有错误，丢弃损坏的数据
  */
@@ -131,15 +135,25 @@ String fixComData(String comData) {
   }
   String res = "";
   for (i = 0; i < 9; i++) {
-    String thisCollection = collections[i];
+    String thisCollection = collections[i]; // name=value, e: humidity=50.50 
     bool correct = false;
     for (j = 0; j < 9; j++) {
-      if (thisCollection.startsWith(collectionNames[j]) != 0 &&
-          '=' == thisCollection.charAt(collectionNames[j].length())) {
+      if (thisCollection.startsWith(specifications[j].name) != 0 &&
+          '=' == thisCollection.charAt(specifications[j].name.length())) {
         correct = true;
         break;
       }
     }
+    unsigned int len = thisCollection.length();
+    if (thisCollection.charAt(len - 1) == '.') {
+      thisCollection.concat("0)");
+    } else if (thisCollection.charAt(len - 2) == '.') {
+      thisCollection.concat("0");
+    } else if (thisCollection.charAt(len - 3) != '.') {
+      // 不包含小数点，或小数点位置不对
+      correct = false;
+    }
+
     if (correct) {
       res += thisCollection;
       res += ',';

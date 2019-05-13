@@ -155,6 +155,7 @@ String readFlammableGas(){
   }
   String res = "gasValue=";
   res.concat(gasValue);
+  res.concat(".00");
   return res;
 }
 
@@ -164,10 +165,11 @@ String readFlammableGas(){
 String readBrightness(){
   unsigned long lux;
   tsl.TSL2581_Read_Channel();
-  lux = tsl.calculateLux(2, NOM_INTEG_CYCLE);
+  lux = tsl.calculateLux(1, NOM_INTEG_CYCLE);
   // Read_gpio_interrupt(2000, 50000);
   String res = "brightness=";
   res.concat(lux);
+  res.concat(".00");
   return res;
 }
 
@@ -204,6 +206,7 @@ String readSound() {
   int soundValue = analogRead(SOUNDPIN);
   String sound = "sound=";
   sound.concat(soundValue);
+  sound.concat(".00");
   return sound;
 }
 
