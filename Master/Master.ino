@@ -138,26 +138,31 @@ String fixComData(String comData) {
     String thisCollection = collections[i]; // name=value, e: humidity=50.50 
     bool correct = false;
     for (j = 0; j < 9; j++) {
-      if (thisCollection.startsWith(specifications[j].name) != 0 &&
-          '=' == thisCollection.charAt(specifications[j].name.length())) {
+      if (thisCollection.startsWith(specifications[j].name + "=") != 0 &&
+          thisCollection.indexOf('=') == thisCollection.lastIndexOf('=')) {
         correct = true;
         break;
       }
     }
+    thisCollection.trim();
     unsigned int len = thisCollection.length();
-    if (thisCollection.charAt(len - 1) == '.') {
-      thisCollection.concat("0)");
-    } else if (thisCollection.charAt(len - 2) == '.') {
-      thisCollection.concat("0");
-    } else if (thisCollection.charAt(len - 3) != '.') {
-      // 不包含小数点，或小数点位置不对
-      correct = false;
+    if (thisCollection.endsWith(".")) {
+      thisCollection.concat("00");
+    } else {
+      unsigned int index = thisCollection.indexOf('.');
+      unsigned int lastIndex = thisCollection.lastIndexOf('.');
+      if (index < 0 || index != lastIndex) {
+        correct = false;
+      }
     }
 
     if (correct) {
       res += thisCollection;
       res += ',';
+    } else {
+      logToDB("丢弃错误数据：", thisCollection);
     }
+    
   }
   return res.substring(0, res.length() - 1);
 }
