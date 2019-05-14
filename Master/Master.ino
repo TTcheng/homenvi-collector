@@ -107,13 +107,11 @@ typedef struct {
 } Specification;
 const Specification specifications[] = {{"humidity", 0, 100},
                                         {"celsius", -40, 80},
-                                        {"heatIndexCelsius", -40, 80},
-                                        {"fahrenheit", -104, 176},
-                                        {"heatIndexFahrenheit", -104, 176},
                                         {"sound", 0, 1023},
                                         {"brightness", 0, 10000},
                                         {"dustDensity", 0, 500},
                                         {"gasValue", 0, 1023}};
+const unsigned int COLL_LEN = 6;
 /**
  * 串口数据可能会有错误，丢弃损坏的数据
  */
@@ -124,9 +122,9 @@ String fixComData(String comData) {
   }
   char chars[maxlen];
   comData.toCharArray(chars, maxlen);
-  String collections[9];
+  String collections[COLL_LEN];
   unsigned int i, j = 0;
-  for (unsigned int i = 0; i < maxlen, chars[i] != 0, j < 9; i++) {
+  for (unsigned int i = 0; i < maxlen, chars[i] != 0, j < COLL_LEN; i++) {
     if (chars[i] == ',') {
       j++;
       continue;
@@ -134,7 +132,10 @@ String fixComData(String comData) {
     collections[j] += chars[i];
   }
   String res = "";
-  for (i = 0; i < 9; i++) {
+  const float unreachableValue = -100.0f;
+  float thisHumidity = unreachableValue;
+  float thisCelsius = unreachableValue;
+  for (i = 0; i < COLL_LEN; i++) {
     String thisCollection = collections[i];  // name=value, e: humidity=50.50
     thisCollection.trim();
     bool correct = false;
@@ -145,7 +146,7 @@ String fixComData(String comData) {
     }
     String nameStr = thisCollection.substring(0, equalIndex);
     Specification thisSpec;
-    for (j = 0; j < 9; j++) {
+    for (j = 0; j < COLL_LEN; j++) {
       if (nameStr == specifications[j].name) {
         thisSpec = specifications[j];
         correct = true;
@@ -161,8 +162,8 @@ String fixComData(String comData) {
     if (index < 0 || index != valueStr.lastIndexOf('.')) {
       correct = false;
     }
+    float thisValue = valueStr.toFloat();
     if (correct) {
-      float thisValue = valueStr.toFloat();
       if (thisValue < thisSpec.min || thisValue > thisSpec.max) {
         correct == false;
       }
@@ -171,13 +172,53 @@ String fixComData(String comData) {
     if (correct) {
       res += thisCollection;
       res += ',';
+      if (nameStr == "humidity") {
+        thisHumidity = thisValue;
+      }
+      if (nameStr == "celsius") {
+        thisCelsius = thisValue;
+      }
     } else {
       logToDB("丢弃值不对的错误数据：", thisCollection);
     }
   }
+  String extra = "";
+  if (thisCelsius > unreachableValue) {
+    extra += "fahrenheit=";
+    extra += (1.8f * thisCelsius + 32.0f);
+    extra += ",";
+    if (thisHumidity > unreachableValue) {
+      extra += "sendibleCelsius=";
+      float sendibleCelsius = calcSendibleCelsius(thisHumidity, thisCelsius);
+      extra += sendibleCelsius;
+      extra += ",";
+      extra += "sendibleFahrenheit=";
+      extra += (1.8f * sendibleCelsius + 32.0f);
+      extra += ",";
+    }
+  }
+  res = extra + res; // fixme res的末尾似乎有什么字符影响了concat操作，导致res.concat(extra)没有效果？
   return res.substring(0, res.length() - 1);
 }
 
+const unsigned int WIND_SPEED = 0; // 默认室内风速为零
+/**
+ * 计算体感温度
+ * AT = 1.07T + 0.2e - 0.65V -2.7
+ * e = (RH/100)*6.105*e^(17.27T/(237.7+T))
+ */
+float calcSendibleCelsius(float humidity, float celsius) {
+  float e = (humidity / 100) * 6.105 * expf(17.27 * celsius / (237.7 + celsius));
+  return 1.07 * celsius + 0.2 * e - 0.65 * WIND_SPEED - 2.7;
+}
+
+typedef struct {
+  String name;
+  unsigned int initialized = 0;
+  float values[10];
+  float sum;
+  const int len = 10;
+} CollectionBuffer;
 /**
  * 写入数据库
  */
