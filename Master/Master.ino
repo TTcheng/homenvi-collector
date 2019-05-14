@@ -135,24 +135,36 @@ String fixComData(String comData) {
   }
   String res = "";
   for (i = 0; i < 9; i++) {
-    String thisCollection = collections[i]; // name=value, e: humidity=50.50 
+    String thisCollection = collections[i];  // name=value, e: humidity=50.50
+    thisCollection.trim();
     bool correct = false;
+    int equalIndex = thisCollection.indexOf('=');
+    if (equalIndex < 0 || equalIndex != thisCollection.lastIndexOf('=')) {
+      logToDB("丢弃没有等号符或有多个等号符的错误数据：", thisCollection);
+      continue;
+    }
+    String nameStr = thisCollection.substring(0, equalIndex);
+    Specification thisSpec;
     for (j = 0; j < 9; j++) {
-      if (thisCollection.startsWith(specifications[j].name + "=") != 0 &&
-          thisCollection.indexOf('=') == thisCollection.lastIndexOf('=')) {
+      if (nameStr == specifications[j].name) {
+        thisSpec = specifications[j];
         correct = true;
         break;
       }
     }
-    thisCollection.trim();
-    unsigned int len = thisCollection.length();
-    if (thisCollection.endsWith(".")) {
-      thisCollection.concat("00");
-    } else {
-      unsigned int index = thisCollection.indexOf('.');
-      unsigned int lastIndex = thisCollection.lastIndexOf('.');
-      if (index < 0 || index != lastIndex) {
-        correct = false;
+    if (!correct) {
+      logToDB("丢弃关键字不对的错误数据：", thisCollection);
+      continue; 
+    }
+    String valueStr = thisCollection.substring(equalIndex + 1);
+    int index = valueStr.indexOf('.');
+    if (index < 0 || index != valueStr.lastIndexOf('.')) {
+      correct = false;
+    }
+    if (correct) {
+      float thisValue = valueStr.toFloat();
+      if (thisValue < thisSpec.min || thisValue > thisSpec.max) {
+        correct == false;
       }
     }
 
@@ -160,9 +172,8 @@ String fixComData(String comData) {
       res += thisCollection;
       res += ',';
     } else {
-      logToDB("丢弃错误数据：", thisCollection);
+      logToDB("丢弃值不对的错误数据：", thisCollection);
     }
-    
   }
   return res.substring(0, res.length() - 1);
 }
