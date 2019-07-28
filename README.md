@@ -1,10 +1,15 @@
 # Homenvi采集端
 
-Homenvi-IEMS室内环境监测系统
+## 概述
 
-- Board：
-    Master: WeMos D1 
-    Slave : Arduino Nano
+此模块的功能是负责全面地采集温湿度、PM2.5、光线强度、烟雾和有毒气体以及噪音等影响用户生活质量的环境参数。采集模块由两个微控制器和五个传感器组成，其组成结构如图所示
 
-- Lib:
-    DHT-sensor-library: https://github.com/adafruit/DHT-sensor-library
+![1564306015319](assets/1564306015319.png)
+
+-  Slave节点
+
+此节点是采集模块中的从属节点，其硬件设备为基于ATmega328P 微控制器的Arduino Nano电路板。该节点通过数字和IO引脚连接了五个负责采集前文所述的环境参数的传感器，负责周期性（5s）地向各传感器发起检测命令并接受检测结果值，对这些值做简单的处理后通过软串口的方式将这些数据发给Master节点。
+
+- Master节点
+
+此节点是采集模块中的主控节点，其硬件设备为基于ESP-8266微控制器的WeMos D1电路板。该节点通过软串口与Slave连接，负责接收Slave节点的数据、对数据进行检查、通过采集的数据计算可以得出额外数据，最后通过WIFI以HTTP协议调用服务器接口，将采集的数据发送到服务器。
